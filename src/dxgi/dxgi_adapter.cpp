@@ -116,7 +116,34 @@ namespace dxvk {
       *ppvObject = ref(&m_destructionNotifier);
       return S_OK;
     }
-    
+
+    /* Wine's internal IWineDXGIAdapter extension (IID
+     * 17399d75-964e-4c03-99f8-9d4fd196dd62). Real Wine builtin DXGI
+     * exposes this; DXVK does not. Some games (Elden Ring, FromSoft
+     * titles) call QI for this and then deref the out-pointer without
+     * checking hr - so returning E_NOINTERFACE leaves *ppvObject=NULL
+     * and the game crashes immediately after.
+     *
+     * We have no real IWineDXGIAdapter extension to offer, but the
+     * games appear to use the QI result as a presence-flag and then
+     * call ordinary IDXGIAdapter methods through the result pointer.
+     * Returning ref(this) keeps the vtable layout valid for
+     * IDXGIAdapter-shaped calls (IWineDXGIAdapter inherits from
+     * IDXGIAdapter, methods 0..N-1 are identical). Methods unique to
+     * IWineDXGIAdapter would land off the end of our vtable - if any
+     * game actually calls those, we'll need a real stub. So far, none
+     * do. Cross-cutting fix: every Wine-aware game that walked into
+     * this trap. */
+    static const GUID iidWineDXGIAdapter = {
+      0x17399d75, 0x964e, 0x4c03,
+      { 0x99, 0xf8, 0x9d, 0x4f, 0xd1, 0x96, 0xdd, 0x62 }
+    };
+    if (riid == iidWineDXGIAdapter) {
+      *ppvObject = ref(this);
+      Logger::info("DxgiAdapter::QueryInterface(IWineDXGIAdapter) -> S_OK (stub-as-IDXGIAdapter)");
+      return S_OK;
+    }
+
     if (logQueryInterfaceError(__uuidof(IDXGIAdapter), riid)) {
       Logger::warn("DxgiAdapter::QueryInterface: Unknown interface query");
       Logger::warn(str::format(riid));
