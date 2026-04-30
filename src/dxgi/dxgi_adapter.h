@@ -3,6 +3,7 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "dxgi_core_adapter.h"
 #include "dxgi_format.h"
 #include "dxgi_interfaces.h"
 #include "dxgi_output.h"
@@ -111,6 +112,7 @@ namespace dxvk {
     Com<DxgiFactory>  m_factory;
     Rc<DxvkAdapter>   m_adapter;
     DxgiVkAdapter     m_interop;
+    DxgiCoreAdapter   m_core;
 
     UINT              m_index = 0u;
     UINT64            m_memReservation[2] = { 0, 0 };

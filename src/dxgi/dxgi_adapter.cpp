@@ -63,6 +63,7 @@ namespace dxvk {
   : m_factory (factory),
     m_adapter (adapter),
     m_interop (this),
+    m_core    (this),
     m_index   (index),
     m_desc    (GetAdapterDesc()),
     m_destructionNotifier(this) {
@@ -102,6 +103,11 @@ namespace dxvk {
 
     if (riid == __uuidof(IDXGIVkInteropAdapter)) {
       *ppvObject = ref(&m_interop);
+      return S_OK;
+    }
+
+    if (riid == __uuidof(IDXCoreAdapter)) {
+      *ppvObject = ref(&m_core);
       return S_OK;
     }
 
