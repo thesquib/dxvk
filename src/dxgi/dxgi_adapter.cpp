@@ -108,6 +108,7 @@ namespace dxvk {
 
     if (riid == __uuidof(IDXCoreAdapter)) {
       *ppvObject = ref(&m_core);
+      Logger::info("DxgiAdapter::QueryInterface(IDXCoreAdapter) -> S_OK");
       return S_OK;
     }
 
