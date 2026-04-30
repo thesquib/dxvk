@@ -760,7 +760,14 @@ namespace dxvk {
         if (f.extensionEnabled)
           message += str::format(" (extension: ", f.extensionEnabled->extensionName, ")");
 
-        return message;
+        /* Apple M-series MoltenVK lacks several "required" Vulkan features
+         * (shaderCullDistance, shaderClipDistance, etc.). On the macOS
+         * Proton port DXVK is loaded primarily for its dxgi.dll (DX12
+         * games go through vkd3d-proton); failing here gates that off.
+         * Log + continue so DXVK init can proceed; rendering paths that
+         * need the missing features will fail later only if actually used. */
+        Logger::warn(str::format(message, " - soft-fail (Apple Silicon Proton port)"));
+        continue;
       }
     }
 
@@ -831,7 +838,13 @@ namespace dxvk {
       ENABLE_FEATURE(core.features, fillModeNonSolid, true),
       ENABLE_FEATURE(core.features, fragmentStoresAndAtomics, true),
       ENABLE_FEATURE(core.features, fullDrawIndexUint32, true),
-      ENABLE_FEATURE(core.features, geometryShader, true),
+      /* macOS/MoltenVK: Metal has no geometry-shader primitive; MoltenVK
+       * doesn't expose the feature. DXVK 2.x requiring it hard-rejects
+       * all Apple Silicon devices at enumerate time, even for DX9 titles
+       * that don't use GS. Flip to optional (require=false) so games
+       * route through DXVK; GS-using shaders will still fail to create
+       * but the enumerate/path-select stage succeeds. */
+      ENABLE_FEATURE(core.features, geometryShader, false),
       ENABLE_FEATURE(core.features, imageCubeArray, true),
       ENABLE_FEATURE(core.features, independentBlend, true),
       ENABLE_FEATURE(core.features, largePoints, false),
