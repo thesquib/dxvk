@@ -173,6 +173,29 @@ IDXGIDXVKAdapter : public IDXGIAdapter4 {
 
 
 /**
+ * \brief Wine's internal IWineDXGIAdapter
+ *
+ * Real Wine builtin DXGI exposes this; vkd3d-proton uses
+ * get_adapter_info() to match a Vulkan physical device against
+ * the DXGI adapter (driver_uuid / device_uuid / luid). Without
+ * a real implementation, vkd3d-proton crashes on the call.
+ */
+struct WineDxgiAdapterInfo {
+  GUID  driver_uuid;
+  GUID  device_uuid;
+  DWORD vendor_id;
+  DWORD device_id;
+  LUID  luid;
+};
+
+MIDL_INTERFACE("17399d75-964e-4c03-99f8-9d4fd196dd62")
+IWineDXGIAdapter : public IDXGIAdapter4 {
+  virtual HRESULT STDMETHODCALLTYPE get_adapter_info(
+          WineDxgiAdapterInfo*      info) = 0;
+};
+
+
+/**
  * \brief Private DXGI device interface
  */
 MIDL_INTERFACE("92a5d77b-b6e1-420a-b260-fdd701272827")
@@ -467,6 +490,7 @@ IDXGIVkInteropFactory1 : public IDXGIVkInteropFactory {
 
 #ifndef _MSC_VER
 __CRT_UUID_DECL(IDXGIDXVKAdapter,          0x907bf281,0xea3c,0x43b4,0xa8,0xe4,0x9f,0x23,0x11,0x07,0xb4,0xff);
+__CRT_UUID_DECL(IWineDXGIAdapter,          0x17399d75,0x964e,0x4c03,0x99,0xf8,0x9d,0x4f,0xd1,0x96,0xdd,0x62);
 __CRT_UUID_DECL(IDXGIDXVKDevice,           0x92a5d77b,0xb6e1,0x420a,0xb2,0x60,0xfd,0xf7,0x01,0x27,0x28,0x27);
 __CRT_UUID_DECL(IDXGIVkMonitorInfo,        0xc06a236f,0x5be3,0x448a,0x89,0x43,0x89,0xc6,0x11,0xc0,0xc2,0xc1);
 __CRT_UUID_DECL(IDXGIVkInteropFactory,     0x4c5e1b0d,0xb0c8,0x4131,0xbf,0xd8,0x9b,0x24,0x76,0xf7,0xf4,0x08);

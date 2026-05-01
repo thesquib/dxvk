@@ -22,16 +22,111 @@ namespace dxvk {
     DxgiVkAdapter(DxgiAdapter* pAdapter);
 
     ULONG STDMETHODCALLTYPE AddRef();
-    
+
     ULONG STDMETHODCALLTYPE Release();
-    
+
     HRESULT STDMETHODCALLTYPE QueryInterface(
             REFIID                    riid,
             void**                    ppvObject);
-    
+
     void STDMETHODCALLTYPE GetVulkanHandles(
             VkInstance*               pInstance,
             VkPhysicalDevice*         pPhysDev);
+
+  private:
+
+    DxgiAdapter* m_adapter;
+
+  };
+
+
+  /**
+   * \brief Wine-style adapter wrapper
+   *
+   * Implements IWineDXGIAdapter (IDXGIAdapter4 + get_adapter_info).
+   * Forwards every IDXGIAdapter4 slot to the wrapped DxgiAdapter so
+   * vtable layout is correct, and fills in get_adapter_info from the
+   * Vulkan physical device properties so vkd3d-proton can match
+   * the DXGI adapter against a Vulkan physical device.
+   */
+  class DxgiWineAdapter : public IWineDXGIAdapter {
+
+  public:
+
+    DxgiWineAdapter(DxgiAdapter* pAdapter);
+
+    ULONG STDMETHODCALLTYPE AddRef();
+
+    ULONG STDMETHODCALLTYPE Release();
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(
+            REFIID                    riid,
+            void**                    ppvObject);
+
+    HRESULT STDMETHODCALLTYPE SetPrivateData(
+            REFGUID                   Name,
+            UINT                      DataSize,
+      const void*                     pData);
+
+    HRESULT STDMETHODCALLTYPE SetPrivateDataInterface(
+            REFGUID                   Name,
+      const IUnknown*                 pUnknown);
+
+    HRESULT STDMETHODCALLTYPE GetPrivateData(
+            REFGUID                   Name,
+            UINT*                     pDataSize,
+            void*                     pData);
+
+    HRESULT STDMETHODCALLTYPE GetParent(
+            REFIID                    riid,
+            void**                    ppParent);
+
+    HRESULT STDMETHODCALLTYPE EnumOutputs(
+            UINT                      Output,
+            IDXGIOutput**             ppOutput);
+
+    HRESULT STDMETHODCALLTYPE GetDesc(
+            DXGI_ADAPTER_DESC*        pDesc);
+
+    HRESULT STDMETHODCALLTYPE GetDesc1(
+            DXGI_ADAPTER_DESC1*       pDesc);
+
+    HRESULT STDMETHODCALLTYPE GetDesc2(
+            DXGI_ADAPTER_DESC2*       pDesc);
+
+    HRESULT STDMETHODCALLTYPE GetDesc3(
+            DXGI_ADAPTER_DESC3*       pDesc);
+
+    HRESULT STDMETHODCALLTYPE CheckInterfaceSupport(
+            REFGUID                   InterfaceName,
+            LARGE_INTEGER*            pUMDVersion);
+
+    HRESULT STDMETHODCALLTYPE QueryVideoMemoryInfo(
+            UINT                          NodeIndex,
+            DXGI_MEMORY_SEGMENT_GROUP     MemorySegmentGroup,
+            DXGI_QUERY_VIDEO_MEMORY_INFO* pVideoMemoryInfo);
+
+    HRESULT STDMETHODCALLTYPE SetVideoMemoryReservation(
+            UINT                          NodeIndex,
+            DXGI_MEMORY_SEGMENT_GROUP     MemorySegmentGroup,
+            UINT64                        Reservation);
+
+    HRESULT STDMETHODCALLTYPE RegisterHardwareContentProtectionTeardownStatusEvent(
+            HANDLE                        hEvent,
+            DWORD*                        pdwCookie);
+
+    HRESULT STDMETHODCALLTYPE RegisterVideoMemoryBudgetChangeNotificationEvent(
+            HANDLE                        hEvent,
+            DWORD*                        pdwCookie);
+
+    void STDMETHODCALLTYPE UnregisterHardwareContentProtectionTeardownStatus(
+            DWORD                         dwCookie);
+
+    void STDMETHODCALLTYPE UnregisterVideoMemoryBudgetChangeNotification(
+            DWORD                         dwCookie);
+
+    HRESULT STDMETHODCALLTYPE get_adapter_info(
+            WineDxgiAdapterInfo*      info);
 
   private:
 
@@ -112,6 +207,7 @@ namespace dxvk {
     Com<DxgiFactory>  m_factory;
     Rc<DxvkAdapter>   m_adapter;
     DxgiVkAdapter     m_interop;
+    DxgiWineAdapter   m_wine;
     DxgiCoreAdapter   m_core;
 
     UINT              m_index = 0u;
