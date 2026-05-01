@@ -56,6 +56,142 @@ namespace dxvk {
 
 
 
+  // ---------------------------------------------------------------------
+  // DxgiWineAdapter — IWineDXGIAdapter wrapper around DxgiAdapter.
+  // Forwards every IDXGIAdapter4 method to the wrapped DxgiAdapter so the
+  // vtable layout is correct, and implements get_adapter_info() for
+  // vkd3d-proton's adapter-matching logic.
+  // ---------------------------------------------------------------------
+
+  DxgiWineAdapter::DxgiWineAdapter(DxgiAdapter* pAdapter)
+  : m_adapter(pAdapter) {
+
+  }
+
+  ULONG STDMETHODCALLTYPE DxgiWineAdapter::AddRef() {
+    return m_adapter->AddRef();
+  }
+
+  ULONG STDMETHODCALLTYPE DxgiWineAdapter::Release() {
+    return m_adapter->Release();
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::QueryInterface(REFIID riid, void** ppvObject) {
+    if (ppvObject == nullptr)
+      return E_POINTER;
+
+    static const GUID iidWineDXGIAdapter = {
+      0x17399d75, 0x964e, 0x4c03,
+      { 0x99, 0xf8, 0x9d, 0x4f, 0xd1, 0x96, 0xdd, 0x62 }
+    };
+
+    if (riid == iidWineDXGIAdapter) {
+      *ppvObject = ref(this);
+      return S_OK;
+    }
+
+    return m_adapter->QueryInterface(riid, ppvObject);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::SetPrivateData(
+          REFGUID Name, UINT DataSize, const void* pData) {
+    return m_adapter->SetPrivateData(Name, DataSize, pData);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::SetPrivateDataInterface(
+          REFGUID Name, const IUnknown* pUnknown) {
+    return m_adapter->SetPrivateDataInterface(Name, pUnknown);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::GetPrivateData(
+          REFGUID Name, UINT* pDataSize, void* pData) {
+    return m_adapter->GetPrivateData(Name, pDataSize, pData);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::GetParent(REFIID riid, void** ppParent) {
+    return m_adapter->GetParent(riid, ppParent);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::EnumOutputs(UINT Output, IDXGIOutput** ppOutput) {
+    return m_adapter->EnumOutputs(Output, ppOutput);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::GetDesc(DXGI_ADAPTER_DESC* pDesc) {
+    return m_adapter->GetDesc(pDesc);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::GetDesc1(DXGI_ADAPTER_DESC1* pDesc) {
+    return m_adapter->GetDesc1(pDesc);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::GetDesc2(DXGI_ADAPTER_DESC2* pDesc) {
+    return m_adapter->GetDesc2(pDesc);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::GetDesc3(DXGI_ADAPTER_DESC3* pDesc) {
+    return m_adapter->GetDesc3(pDesc);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::CheckInterfaceSupport(
+          REFGUID InterfaceName, LARGE_INTEGER* pUMDVersion) {
+    return m_adapter->CheckInterfaceSupport(InterfaceName, pUMDVersion);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::QueryVideoMemoryInfo(
+          UINT NodeIndex, DXGI_MEMORY_SEGMENT_GROUP MemorySegmentGroup,
+          DXGI_QUERY_VIDEO_MEMORY_INFO* pVideoMemoryInfo) {
+    return m_adapter->QueryVideoMemoryInfo(NodeIndex, MemorySegmentGroup, pVideoMemoryInfo);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::SetVideoMemoryReservation(
+          UINT NodeIndex, DXGI_MEMORY_SEGMENT_GROUP MemorySegmentGroup, UINT64 Reservation) {
+    return m_adapter->SetVideoMemoryReservation(NodeIndex, MemorySegmentGroup, Reservation);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::RegisterHardwareContentProtectionTeardownStatusEvent(
+          HANDLE hEvent, DWORD* pdwCookie) {
+    return m_adapter->RegisterHardwareContentProtectionTeardownStatusEvent(hEvent, pdwCookie);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::RegisterVideoMemoryBudgetChangeNotificationEvent(
+          HANDLE hEvent, DWORD* pdwCookie) {
+    return m_adapter->RegisterVideoMemoryBudgetChangeNotificationEvent(hEvent, pdwCookie);
+  }
+
+  void STDMETHODCALLTYPE DxgiWineAdapter::UnregisterHardwareContentProtectionTeardownStatus(
+          DWORD dwCookie) {
+    m_adapter->UnregisterHardwareContentProtectionTeardownStatus(dwCookie);
+  }
+
+  void STDMETHODCALLTYPE DxgiWineAdapter::UnregisterVideoMemoryBudgetChangeNotification(
+          DWORD dwCookie) {
+    m_adapter->UnregisterVideoMemoryBudgetChangeNotification(dwCookie);
+  }
+
+  HRESULT STDMETHODCALLTYPE DxgiWineAdapter::get_adapter_info(WineDxgiAdapterInfo* info) {
+    if (!info)
+      return E_POINTER;
+
+    auto deviceProp = m_adapter->GetDXVKAdapter()->deviceProperties();
+
+    std::memset(info, 0, sizeof(*info));
+
+    static_assert(sizeof(info->driver_uuid) == VK_UUID_SIZE);
+    static_assert(sizeof(info->device_uuid) == VK_UUID_SIZE);
+    std::memcpy(&info->driver_uuid, deviceProp.vk11.driverUUID, VK_UUID_SIZE);
+    std::memcpy(&info->device_uuid, deviceProp.vk11.deviceUUID, VK_UUID_SIZE);
+
+    info->vendor_id = deviceProp.core.properties.vendorID;
+    info->device_id = deviceProp.core.properties.deviceID;
+
+    DXGI_ADAPTER_DESC1 desc = { };
+    m_adapter->GetDesc1(&desc);
+    info->luid = desc.AdapterLuid;
+
+    return S_OK;
+  }
+
+
   DxgiAdapter::DxgiAdapter(
           DxgiFactory*      factory,
     const Rc<DxvkAdapter>&  adapter,
@@ -63,11 +199,12 @@ namespace dxvk {
   : m_factory (factory),
     m_adapter (adapter),
     m_interop (this),
+    m_wine    (this),
     m_core    (this),
     m_index   (index),
     m_desc    (GetAdapterDesc()),
     m_destructionNotifier(this) {
-    
+
   }
   
   
@@ -117,30 +254,18 @@ namespace dxvk {
       return S_OK;
     }
 
-    /* Wine's internal IWineDXGIAdapter extension (IID
-     * 17399d75-964e-4c03-99f8-9d4fd196dd62). Real Wine builtin DXGI
-     * exposes this; DXVK does not. Some games (Elden Ring, FromSoft
-     * titles) call QI for this and then deref the out-pointer without
-     * checking hr - so returning E_NOINTERFACE leaves *ppvObject=NULL
-     * and the game crashes immediately after.
-     *
-     * We have no real IWineDXGIAdapter extension to offer, but the
-     * games appear to use the QI result as a presence-flag and then
-     * call ordinary IDXGIAdapter methods through the result pointer.
-     * Returning ref(this) keeps the vtable layout valid for
-     * IDXGIAdapter-shaped calls (IWineDXGIAdapter inherits from
-     * IDXGIAdapter, methods 0..N-1 are identical). Methods unique to
-     * IWineDXGIAdapter would land off the end of our vtable - if any
-     * game actually calls those, we'll need a real stub. So far, none
-     * do. Cross-cutting fix: every Wine-aware game that walked into
-     * this trap. */
+    /* Wine's internal IWineDXGIAdapter (IID
+     * 17399d75-964e-4c03-99f8-9d4fd196dd62). vkd3d-proton calls
+     * get_adapter_info() (slot past IDXGIAdapter4's end) to match
+     * a Vulkan physical device against the DXGI adapter. Return our
+     * DxgiWineAdapter wrapper so that slot is real. Cross-cutting fix:
+     * any Wine-aware D3D12 title (Elden Ring, FromSoft, etc.). */
     static const GUID iidWineDXGIAdapter = {
       0x17399d75, 0x964e, 0x4c03,
       { 0x99, 0xf8, 0x9d, 0x4f, 0xd1, 0x96, 0xdd, 0x62 }
     };
     if (riid == iidWineDXGIAdapter) {
-      *ppvObject = ref(this);
-      Logger::info("DxgiAdapter::QueryInterface(IWineDXGIAdapter) -> S_OK (stub-as-IDXGIAdapter)");
+      *ppvObject = ref(&m_wine);
       return S_OK;
     }
 
