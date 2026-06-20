@@ -279,6 +279,52 @@ namespace dxvk {
   }
   
   
+  // Composition swap chains (CreateSwapChainForComposition) carry no HWND: on
+  // Windows the app binds them to a window later via DirectComposition. On our
+  // macOS/winemac stack there is no real compositor, so without a window the
+  // DxgiSurfaceFactory falls back to a hidden dummy window and the content is
+  // presented off screen (only the real window's clear shows). Godot 4's d3d12
+  // backend is the canonical case.
+  //
+  // PRAGMATIC HEURISTIC: present to the process's largest visible top-level
+  // window. For single-window games (Godot et al.) this is exactly the window
+  // the app would bind the swap chain to via DComp's CreateTargetForHwnd, so it
+  // is correct in practice. wine's dcomp implementation supplies the matching
+  // IDCompositionDevice/Target/Visual COM tree so the app's swap_chain_create
+  // succeeds. If no suitable window is found we fall back to the dummy window
+  // (i.e. previous behaviour, no regression).
+  //
+  // The fully-correct alternative ("route B") routes the exact HWND from
+  // dcomp's Commit() into the swap chain via the IDXGIVkCompositionSwapChain
+  // private interface (a stub of which dcomp already queries), recreating the
+  // Vulkan surface on vkd3d-proton's present thread. It handles multi-window /
+  // create-before-show edge cases but adds present-thread surface-recreation
+  // risk for little real-world gain. See
+  // docs/macos/experiments/wine-dcomp-composition-swapchain-2026-06-20.md.
+  namespace {
+    struct CompFindWindowCtx { DWORD pid; HWND best; int64_t bestArea; };
+
+    static BOOL CALLBACK CompFindMainWindowProc(HWND hWnd, LPARAM lParam) {
+      auto* ctx = reinterpret_cast<CompFindWindowCtx*>(lParam);
+      DWORD pid = 0;
+      ::GetWindowThreadProcessId(hWnd, &pid);
+      if (pid != ctx->pid || !::IsWindowVisible(hWnd))
+        return TRUE;
+      RECT r = { };
+      if (!::GetWindowRect(hWnd, &r))
+        return TRUE;
+      int64_t area = int64_t(r.right - r.left) * int64_t(r.bottom - r.top);
+      if (area > ctx->bestArea) { ctx->bestArea = area; ctx->best = hWnd; }
+      return TRUE;
+    }
+
+    static HWND CompFindProcessMainWindow() {
+      CompFindWindowCtx ctx = { ::GetCurrentProcessId(), nullptr, 0 };
+      ::EnumWindows(CompFindMainWindowProc, reinterpret_cast<LPARAM>(&ctx));
+      return ctx.best;
+    }
+  }
+
   HRESULT STDMETHODCALLTYPE DxgiFactory::CreateSwapChainForComposition(
           IUnknown*             pDevice,
     const DXGI_SWAP_CHAIN_DESC1* pDesc,
@@ -291,10 +337,19 @@ namespace dxvk {
       return E_NOTIMPL;
     }
 
-    Logger::warn("DxgiFactory::CreateSwapChainForComposition: Creating dummy swap chain");
+    HWND presentWindow = CompFindProcessMainWindow();
+    if (presentWindow) {
+      Logger::info(str::format(
+        "DxgiFactory::CreateSwapChainForComposition: presenting to process window ",
+        presentWindow));
+    } else {
+      Logger::warn(
+        "DxgiFactory::CreateSwapChainForComposition: no process window found, "
+        "falling back to dummy window (content will not be visible)");
+    }
 
     return CreateSwapChainBase(pDevice,
-      nullptr, pDesc, nullptr, pRestrictToOutput, ppSwapChain);
+      presentWindow, pDesc, nullptr, pRestrictToOutput, ppSwapChain);
   }
   
   
