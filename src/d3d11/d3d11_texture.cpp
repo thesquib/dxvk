@@ -2,6 +2,7 @@
 #include "d3d11_context_imm.h"
 #include "d3d11_gdi.h"
 #include "d3d11_texture.h"
+#include "d3d11_shared_emul.h"
 
 #include "../util/util_shared_res.h"
 #include "../util/util_win32_compat.h"
@@ -239,7 +240,17 @@ namespace dxvk {
     if (m_11on12.Resource != nullptr)
       vkImage = VkImage(m_11on12.VulkanHandle);
 
-    if (!vkImage)
+    // Intra-process shared-resource emulation: if this is the consumer side of
+    // a share (Import) and the producer registered the image because the driver
+    // lacks external_memory_win32, adopt that same DxvkImage instead of trying
+    // to import memory through a handle the driver cannot export.
+    D3D11SharedResourceEmulation::Entry emulEntry;
+    bool emulAdopt = imageInfo.sharing.mode == DxvkSharedHandleMode::Import
+                  && D3D11SharedResourceEmulation::get().lookup(hSharedHandle, emulEntry);
+
+    if (emulAdopt)
+      m_image = emulEntry.image;
+    else if (!vkImage)
       m_image = m_device->GetDXVKDevice()->createImage(imageInfo, memoryProperties);
     else
       m_image = m_device->GetDXVKDevice()->importImage(imageInfo, vkImage, memoryProperties);
@@ -257,13 +268,23 @@ namespace dxvk {
         }
       }
 
-      ExportImageInfo();
+      if (!m_device->GetDXVKDevice()->features().khrExternalMemoryWin32) {
+        // No real external memory (e.g. KosmicKrisp on Metal): the image was
+        // created as an ordinary VkImage. Register it for intra-process sharing
+        // so GetSharedHandle hands back a usable handle and the consumer's
+        // OpenSharedResource adopts this same image. Without this the title
+        // hangs forever waiting on a shared handle that never arrives.
+        m_emulatedShareHandle = D3D11SharedResourceEmulation::get().registerImage(m_image, m_desc);
+      } else {
+        ExportImageInfo();
+      }
     }
   }
-  
-  
+
+
   D3D11CommonTexture::~D3D11CommonTexture() {
-    
+    if (m_emulatedShareHandle)
+      D3D11SharedResourceEmulation::get().unregisterHandle(m_emulatedShareHandle);
   }
   
   
