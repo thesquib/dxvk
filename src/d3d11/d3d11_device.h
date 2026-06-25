@@ -557,6 +557,16 @@ namespace dxvk {
             REFIID      ReturnedInterface,
             void**      ppResource);
 
+    // Intra-process shared-resource emulation: if hResource was minted by our
+    // same-process share registry, build a texture that adopts the registered
+    // image and return true (with the result in hr). Returns false for a real
+    // OS handle so the caller falls through to the normal D3DKMT path.
+    bool OpenEmulatedSharedResource(
+            HANDLE      hResource,
+            REFIID      ReturnedInterface,
+            void**      ppResource,
+            HRESULT&    hr);
+
     uint32_t GetViewPlaneIndex(
             ID3D11Resource*         pResource,
             DXGI_FORMAT             ViewFormat);
