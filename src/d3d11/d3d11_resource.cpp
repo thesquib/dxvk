@@ -242,8 +242,18 @@ namespace dxvk {
 
     HANDLE kmtHandle = texture->GetImage()->sharedHandle();
 
-    if (kmtHandle == INVALID_HANDLE_VALUE)
+    if (kmtHandle == INVALID_HANDLE_VALUE) {
+      // Intra-process shared-resource emulation: drivers without
+      // external_memory_win32 register a process-local handle instead, so the
+      // producer can hand a usable handle to OpenSharedResource in the same
+      // process rather than blocking forever on E_INVALIDARG.
+      HANDLE emulated = texture->GetEmulatedShareHandle();
+      if (emulated) {
+        *pSharedHandle = emulated;
+        return S_OK;
+      }
       return E_INVALIDARG;
+    }
 
     *pSharedHandle = kmtHandle;
     return S_OK;

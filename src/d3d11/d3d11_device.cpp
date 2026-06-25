@@ -22,6 +22,7 @@
 #include "d3d11_interop.h"
 #include "d3d11_query.h"
 #include "d3d11_resource.h"
+#include "d3d11_shared_emul.h"
 #include "d3d11_sampler.h"
 #include "d3d11_shader.h"
 #include "d3d11_state_object.h"
@@ -1442,6 +1443,8 @@ namespace dxvk {
           void**      ppResource) {
     InitReturnPtr(ppResource);
 
+    { HRESULT emulHr; if (OpenEmulatedSharedResource(hResource, ReturnedInterface, ppResource, emulHr)) return emulHr; }
+
     if (!(reinterpret_cast<uintptr_t>(hResource) & 0xc0000000)) {
       Logger::warn("D3D11Device::OpenSharedResource: Invalid shared handle type");
       return E_INVALIDARG;
@@ -1528,6 +1531,8 @@ namespace dxvk {
           REFIID      ReturnedInterface,
           void**      ppResource) {
     InitReturnPtr(ppResource);
+
+    { HRESULT emulHr; if (OpenEmulatedSharedResource(hResource, ReturnedInterface, ppResource, emulHr)) return emulHr; }
 
     if (reinterpret_cast<uintptr_t>(hResource) & 0xc0000000) {
       Logger::warn("D3D11Device::OpenSharedResource1: Invalid shared handle type");
@@ -2561,6 +2566,33 @@ namespace dxvk {
     }
 
     return ~0u;
+  }
+
+
+  bool D3D11Device::OpenEmulatedSharedResource(
+          HANDLE      hResource,
+          REFIID      ReturnedInterface,
+          void**      ppResource,
+          HRESULT&    hr) {
+    D3D11SharedResourceEmulation::Entry entry;
+    if (!D3D11SharedResourceEmulation::get().lookup(hResource, entry))
+      return false;
+
+    // Same-process share: rebuild the texture from the registered desc. Passing
+    // hResource as the shared handle makes the texture ctor adopt the SAME
+    // DxvkImage (same VkImage, same device) instead of importing memory through
+    // an external handle the driver cannot export.
+    D3D11_COMMON_TEXTURE_DESC desc = entry.desc;
+
+    try {
+      const Com<D3D11Texture2D> texture = new D3D11Texture2D(this, &desc, nullptr, hResource);
+      hr = texture->QueryInterface(ReturnedInterface, ppResource);
+    } catch (const DxvkError& e) {
+      Logger::err(e.message());
+      hr = E_INVALIDARG;
+    }
+
+    return true;
   }
 
 
