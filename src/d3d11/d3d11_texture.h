@@ -249,7 +249,19 @@ namespace dxvk {
     Rc<DxvkImage> GetImage() const {
       return m_image;
     }
-    
+
+    /**
+     * \brief Intra-process shared-resource handle
+     *
+     * Non-null on the producer side of a share when the driver lacks
+     * external_memory_win32 and we registered this image for same-process
+     * sharing. GetSharedHandle returns it as the resource's shared handle.
+     * \returns Emulated share handle, or nullptr
+     */
+    HANDLE GetEmulatedShareHandle() const {
+      return m_emulatedShareHandle;
+    }
+
     /**
      * \brief Mapped subresource buffer
      * 
@@ -583,6 +595,7 @@ namespace dxvk {
     VkFormat                      m_packedFormat;
     
     Rc<DxvkImage>                 m_image;
+    HANDLE                        m_emulatedShareHandle = nullptr;
     small_vector<MappedBuffer, 6> m_buffers;
     small_vector<MappedInfo, 6>   m_mapInfo;
 
