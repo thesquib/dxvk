@@ -334,7 +334,14 @@ namespace dxvk {
     allocationInfo.resourceCookie = cookie();
     allocationInfo.properties = m_properties;
     allocationInfo.mode = mode;
-    allocationInfo.handleType = m_info.sharing.type;
+    // Only request an external (exportable/importable) memory handle type when
+    // sharing is actually possible. When sharing was requested but the driver
+    // lacks external_memory_win32 (m_shared==false, e.g. KosmicKrisp), leaving
+    // handleType set makes the allocator try to allocate exportable memory and
+    // the whole image creation throws - which aborts the shared texture before
+    // the D3D11 layer can fall back to intra-process emulation. Allocate a plain
+    // image instead.
+    allocationInfo.handleType = m_shared ? m_info.sharing.type : VK_EXTERNAL_MEMORY_HANDLE_TYPE_FLAG_BITS_MAX_ENUM;
 
     if (m_info.transient)
       allocationInfo.mode.set(DxvkAllocationMode::NoDedicated);
