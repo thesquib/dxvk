@@ -301,12 +301,16 @@ namespace dxvk::wsi {
 
 
   bool Win32WsiDriver::isOccluded(HWND hWindow) {
-    if (::GetForegroundWindow() == hWindow)
-    {
-      m_lastForegroundTimestamp = GetTickCount64();
-      return false;
-    }
-    return m_lastForegroundTimestamp && GetTickCount64() - m_lastForegroundTimestamp > 100;
+    // proton-mac: on winemac the desktop is always composited - there is no true
+    // exclusive fullscreen mode to lose, so DXGI's "occluded -> SetFullscreenState
+    // (FALSE)" behaviour (dxgi_swapchain.cpp Present) is pointless here. Worse, the
+    // heuristic below keys occlusion off GetForegroundWindow()==hWindow, which is
+    // unreliable in the multi-process bridge (headless Steam + the E.1 layer host
+    // hold wine's foreground), so it false-positives ~100ms after launch and the
+    // game thrashes Enter/LeaveFullscreenMode at gameplay entry (Clair Obscur
+    // bailed here). Never report occluded; let alt-tab be handled by minimize.
+    (void)hWindow;
+    return false;
   }
 
 
