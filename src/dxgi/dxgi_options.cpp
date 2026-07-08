@@ -136,7 +136,15 @@ namespace dxvk {
     this->customVendorId = parsePciId(config.getOption<std::string>("dxgi.customVendorId"));
     this->customDeviceId = parsePciId(config.getOption<std::string>("dxgi.customDeviceId"));
     this->customDeviceDesc = config.getOption<std::string>("dxgi.customDeviceDesc", "");
-    
+
+    // Env-var DXGI adapter spoof (takes precedence over config-file custom* above)
+    auto envVendor = env::getEnvVar("DXVK_FORCE_DXGI_VENDOR_ID");
+    auto envDevice = env::getEnvVar("DXVK_FORCE_DXGI_DEVICE_ID");
+    this->forceVendorId   = parsePciId(envVendor);
+    this->forceDeviceId   = parsePciId(envDevice);
+    this->forceDeviceDesc = env::getEnvVar("DXVK_FORCE_DXGI_DESCRIPTION");
+
+
     // Interpret the memory limits as Megabytes
     this->maxDeviceMemory = VkDeviceSize(config.getOption<int32_t>("dxgi.maxDeviceMemory", 0)) << 20;
     this->maxSharedMemory = VkDeviceSize(config.getOption<int32_t>("dxgi.maxSharedMemory", 0)) << 20;

@@ -856,7 +856,12 @@ namespace dxvk {
       ENABLE_FEATURE(core.features, sampleRateShading, true),
       ENABLE_FEATURE(core.features, samplerAnisotropy, true),
       ENABLE_FEATURE(core.features, shaderClipDistance, true),
-      ENABLE_FEATURE(core.features, shaderCullDistance, true),
+      /* macOS/MoltenVK: Apple GPU lacks SV_CullDistance hardware. Venus on
+       * M-series reports shaderCullDistance=false. Flip to optional so
+       * adapter enumeration succeeds; shaders that actually use cull
+       * distances will fail at pipeline-create instead of locking us out
+       * of every game. */
+      ENABLE_FEATURE(core.features, shaderCullDistance, false),
       ENABLE_FEATURE(core.features, shaderFloat64, false),
       ENABLE_FEATURE(core.features, shaderImageGatherExtended, true),
       ENABLE_FEATURE(core.features, shaderInt16, true),
