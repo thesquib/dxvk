@@ -573,7 +573,26 @@ namespace dxvk {
       ? std::string(adapterInfo.deviceName)
       : options->customDeviceDesc;
 
-    if (options->customVendorId < 0) {
+    // Env-var spoof: DXVK_FORCE_DXGI_VENDOR_ID / DXVK_FORCE_DXGI_DEVICE_ID / DXVK_FORCE_DXGI_DESCRIPTION
+    // These override config-file custom* values and run after them. Description field
+    // is a std::string named `description` already in scope.
+    if (options->forceVendorId >= 0)
+      deviceProp.core.properties.vendorID = options->forceVendorId;
+
+    if (options->forceDeviceId >= 0)
+      deviceProp.core.properties.deviceID = options->forceDeviceId;
+
+    if (!options->forceDeviceDesc.empty())
+      description = options->forceDeviceDesc;
+
+    if (options->forceVendorId >= 0 || options->forceDeviceId >= 0 || !options->forceDeviceDesc.empty()) {
+      Logger::info(str::format("DXGI: DXVK_FORCE_DXGI spoof active:\n",
+                               "  vendor ID:   0x", std::hex, deviceProp.core.properties.vendorID, "\n",
+                               "  device ID:   0x", std::hex, deviceProp.core.properties.deviceID, "\n",
+                               "  description: ", description));
+    }
+
+    if (options->customVendorId < 0 && options->forceVendorId < 0) {
       uint16_t fallbackVendor = 0xdead;
       uint16_t fallbackDevice = 0xbeef;
 
