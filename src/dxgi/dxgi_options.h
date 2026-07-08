@@ -32,7 +32,14 @@ namespace dxvk {
     int32_t customVendorId;
     int32_t customDeviceId;
     std::string customDeviceDesc;
-    
+
+    // Env-var overrides: DXVK_FORCE_DXGI_VENDOR_ID / DXVK_FORCE_DXGI_DEVICE_ID /
+    // DXVK_FORCE_DXGI_DESCRIPTION. Take precedence over config-file customVendorId etc.
+    int32_t     forceVendorId;
+    int32_t     forceDeviceId;
+    std::string forceDeviceDesc;
+
+
     /// Override maximum reported VRAM size. This may be
     /// useful for some 64-bit games which do not support
     /// more than 4 GiB of VRAM.
