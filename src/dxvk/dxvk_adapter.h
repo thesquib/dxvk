@@ -165,6 +165,20 @@ namespace dxvk {
     }
 
     /**
+     * \brief Device properties
+     *
+     * Used by the IWineDXGIAdapter wrapper (get_adapter_info) and the
+     * DXVK_FORCE_DXGI_* GPU-identity spoof. Re-provided on top of the new
+     * device-capability class after upstream removed the old accessor
+     * (kept only memoryProperties); returns the full DxvkDeviceInfo so
+     * callers can read core.properties.{vendorID,deviceID,...}.
+     * \returns Device properties
+     */
+    const DxvkDeviceInfo& deviceProperties() const {
+      return m_capabilities.getProperties();
+    }
+
+    /**
      * \brief Checks whether the adapter is usable for DXVK
      *
      * \param [out] error Detailed error message on error
