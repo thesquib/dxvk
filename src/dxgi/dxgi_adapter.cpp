@@ -574,21 +574,23 @@ namespace dxvk {
       : options->customDeviceDesc;
 
     // Env-var spoof: DXVK_FORCE_DXGI_VENDOR_ID / DXVK_FORCE_DXGI_DEVICE_ID / DXVK_FORCE_DXGI_DESCRIPTION
-    // These override config-file custom* values and run after them. Description field
-    // is a std::string named `description` already in scope.
+    // These override config-file custom* values and run after them. Mirrors the
+    // custom* path above, which mutates `adapterInfo` (upstream replaced the old
+    // deviceProp/DxvkDeviceInfo access here with m_adapter->info()). Description
+    // field is a std::string named `description` already in scope.
     if (options->forceVendorId >= 0)
-      deviceProp.core.properties.vendorID = options->forceVendorId;
+      adapterInfo.vendorId = options->forceVendorId;
 
     if (options->forceDeviceId >= 0)
-      deviceProp.core.properties.deviceID = options->forceDeviceId;
+      adapterInfo.deviceId = options->forceDeviceId;
 
     if (!options->forceDeviceDesc.empty())
       description = options->forceDeviceDesc;
 
     if (options->forceVendorId >= 0 || options->forceDeviceId >= 0 || !options->forceDeviceDesc.empty()) {
       Logger::info(str::format("DXGI: DXVK_FORCE_DXGI spoof active:\n",
-                               "  vendor ID:   0x", std::hex, deviceProp.core.properties.vendorID, "\n",
-                               "  device ID:   0x", std::hex, deviceProp.core.properties.deviceID, "\n",
+                               "  vendor ID:   0x", std::hex, adapterInfo.vendorId, "\n",
+                               "  device ID:   0x", std::hex, adapterInfo.deviceId, "\n",
                                "  description: ", description));
     }
 
