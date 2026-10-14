@@ -24,6 +24,11 @@ namespace dxvk {
     /// Enable graphics pipeline library
     Tristate enableGraphicsPipelineLibrary = Tristate::Auto;
 
+    /// proton-mac: compile missing pipelines on the worker threads and skip
+    /// the draws that need them until they are ready, instead of stalling
+    /// (drivers without graphics pipeline libraries, e.g. KosmicKrisp)
+    bool enableAsync = false;
+
     /// Enable descriptor heap
     Tristate enableDescriptorHeap = Tristate::Auto;
 
