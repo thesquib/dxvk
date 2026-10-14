@@ -1109,9 +1109,25 @@ namespace dxvk {
       instance = this->findInstance(state);
 
       if (!instance) {
+        bool canCreateBasePipeline = this->canCreateBasePipeline(state);
+
+        // proton-mac: without a fast-linkable base pipeline, hand the compile
+        // to a worker and skip draws until it lands. Not for pipelines with
+        // side effects a skipped draw would lose (XFB, UAV writes).
+        if (!canCreateBasePipeline && m_device->config().enableAsync
+         && !m_flags.any(DxvkGraphicsPipelineFlag::HasTransformFeedback,
+                         DxvkGraphicsPipelineFlag::HasStorageDescriptors)) {
+          instance = m_pipelines.add(state, VK_NULL_HANDLE, VK_NULL_HANDLE,
+            computeAttachmentMask(state));
+          m_stats->numGraphicsPipelines += 1;
+          lock.unlock();
+
+          m_workers->compileGraphicsPipeline(this, state, DxvkPipelinePriority::High);
+          return instance->getHandle();
+        }
+
         // Keep pipeline object locked, at worst we're going to stall
         // a state cache worker and the current thread needs priority.
-        bool canCreateBasePipeline = this->canCreateBasePipeline(state);
         instance = this->createInstance(state, canCreateBasePipeline);
 
         // Unlock here since we may dispatch the pipeline to a worker,
