@@ -35,13 +35,29 @@ namespace dxvk {
   }
   
   
+  // proton-mac: DXVK_ASYNC_TRACE=1 logs pipeline work that still blocks a dispatch (>= 2 ms)
+  static bool asyncTraceEnabled() {
+    static const bool enabled = env::getEnvVar("DXVK_ASYNC_TRACE") == "1";
+    return enabled;
+  }
+
+
   VkPipeline DxvkComputePipeline::getPipelineHandle(
     const DxvkComputePipelineStateInfo& state) {
     if (!m_libraryHandle) {
       // Retrieve actual pipeline handle on first use. This
       // may wait for an ongoing compile job to finish, or
       // compile the pipeline immediately on the calling thread.
+      auto t0 = dxvk::high_resolution_clock::now();
       m_libraryHandle = m_library->acquirePipelineHandle().handle;
+
+      if (asyncTraceEnabled()) {
+        auto us = std::chrono::duration_cast<std::chrono::microseconds>(
+          dxvk::high_resolution_clock::now() - t0).count();
+
+        if (us >= 2000)
+          Logger::warn(str::format("[async-trace] compute first-use ", us / 1000, " ms"));
+      }
     }
 
     if (*m_libraryHandle) {
@@ -56,8 +72,18 @@ namespace dxvk {
         std::lock_guard<dxvk::mutex> lock(m_mutex);
         instance = this->findInstance(state);
 
-        if (!instance)
+        if (!instance) {
+          auto t0 = dxvk::high_resolution_clock::now();
           instance = this->createInstance(state);
+
+          if (asyncTraceEnabled()) {
+            auto us = std::chrono::duration_cast<std::chrono::microseconds>(
+              dxvk::high_resolution_clock::now() - t0).count();
+
+            if (us >= 2000)
+              Logger::warn(str::format("[async-trace] compute spec-const inline ", us / 1000, " ms"));
+          }
+        }
       }
 
       return instance->handle;

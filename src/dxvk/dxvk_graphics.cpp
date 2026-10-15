@@ -1095,6 +1095,13 @@ namespace dxvk {
   }
 
 
+  // proton-mac: DXVK_ASYNC_TRACE=1 logs pipeline work that still blocks a draw (>= 2 ms)
+  static bool asyncTraceEnabled() {
+    static const bool enabled = env::getEnvVar("DXVK_ASYNC_TRACE") == "1";
+    return enabled;
+  }
+
+
   DxvkGraphicsPipelineHandle DxvkGraphicsPipeline::getPipelineHandle(
     const DxvkGraphicsPipelineStateInfo& state) {
     DxvkGraphicsPipelineInstance* instance = this->findInstance(state);
@@ -1123,12 +1130,35 @@ namespace dxvk {
           lock.unlock();
 
           m_workers->compileGraphicsPipeline(this, state, DxvkPipelinePriority::High);
+
+          if (asyncTraceEnabled()) {
+            static std::atomic<uint32_t> s_async = { 0u };
+            uint32_t n = ++s_async;
+
+            if (!(n % 50u))
+              Logger::warn(str::format("[async-trace] gfx async total ", n));
+          }
+
           return instance->getHandle();
         }
+
+        auto t0 = dxvk::high_resolution_clock::now();
 
         // Keep pipeline object locked, at worst we're going to stall
         // a state cache worker and the current thread needs priority.
         instance = this->createInstance(state, canCreateBasePipeline);
+
+        if (asyncTraceEnabled()) {
+          auto t1 = dxvk::high_resolution_clock::now();
+          auto us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+          if (us >= 2000) {
+            Logger::warn(str::format("[async-trace] gfx inline ", us / 1000, " ms base=", canCreateBasePipeline ? 1 : 0,
+              " xfb=", m_flags.test(DxvkGraphicsPipelineFlag::HasTransformFeedback) ? 1 : 0,
+              " uav=", m_flags.test(DxvkGraphicsPipelineFlag::HasStorageDescriptors) ? 1 : 0,
+              " async=", m_device->config().enableAsync ? 1 : 0));
+          }
+        }
 
         // Unlock here since we may dispatch the pipeline to a worker,
         // which will then acquire it to increment the use counter.
