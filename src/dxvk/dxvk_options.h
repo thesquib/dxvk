@@ -29,6 +29,11 @@ namespace dxvk {
     /// (drivers without graphics pipeline libraries, e.g. KosmicKrisp)
     bool enableAsync = false;
 
+    /// proton-mac: also compile pipelines with storage descriptors (UAV
+    /// writes) asynchronously. Safe only where those writes are hints a
+    /// skipped draw can lose, e.g. UE virtual-texture feedback
+    bool enableAsyncStorage = false;
+
     /// Enable descriptor heap
     Tristate enableDescriptorHeap = Tristate::Auto;
 
