@@ -1120,10 +1120,12 @@ namespace dxvk {
 
         // proton-mac: without a fast-linkable base pipeline, hand the compile
         // to a worker and skip draws until it lands. Not for pipelines with
-        // side effects a skipped draw would lose (XFB, UAV writes).
+        // side effects a skipped draw would lose (XFB; UAV writes unless the
+        // title opts in with enableAsyncStorage).
         if (!canCreateBasePipeline && m_device->config().enableAsync
-         && !m_flags.any(DxvkGraphicsPipelineFlag::HasTransformFeedback,
-                         DxvkGraphicsPipelineFlag::HasStorageDescriptors)) {
+         && !m_flags.test(DxvkGraphicsPipelineFlag::HasTransformFeedback)
+         && (!m_flags.test(DxvkGraphicsPipelineFlag::HasStorageDescriptors)
+          || m_device->config().enableAsyncStorage)) {
           instance = m_pipelines.add(state, VK_NULL_HANDLE, VK_NULL_HANDLE,
             computeAttachmentMask(state));
           m_stats->numGraphicsPipelines += 1;

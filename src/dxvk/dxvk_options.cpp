@@ -9,6 +9,8 @@ namespace dxvk {
     enableGraphicsPipelineLibrary = config.getOption<Tristate>("dxvk.enableGraphicsPipelineLibrary", Tristate::Auto);
     enableAsync           = config.getOption<bool>    ("dxvk.enableAsync",
       env::getEnvVar("DXVK_ASYNC") == "1");
+    enableAsyncStorage    = config.getOption<bool>    ("dxvk.enableAsyncStorage",
+      env::getEnvVar("DXVK_ASYNC_UAV") == "1");
     enableDescriptorHeap  = config.getOption<Tristate>("dxvk.enableDescriptorHeap",   Tristate::Auto);
     enableDescriptorBuffer = config.getOption<Tristate>("dxvk.enableDescriptorBuffer", Tristate::Auto);
     enableDescriptorUpdateTemplates = config.getOption<bool>("dxvk.enableDescriptorUpdateTemplates", false);
